@@ -5,6 +5,7 @@ from mpi4py import MPI
 import env
 import gym
 import os
+import pickle as pkl
 from arguments import get_args
 from rl_modules.rl_agent import RLAgent
 import random
@@ -57,7 +58,12 @@ def launch(args):
 
     args.env_params = get_env_params(env)
 
-    goal_sampler = GoalSampler(args)
+    # Load test set for transfer learning study 
+    with open(f'./test_sets/test_set_{args.test_set_id}.pkl', 'rb') as f:
+        test_set_list = pkl.load(f)
+    if rank == 0: print(f'Loading test set {args.test_set_id:d}')
+
+    goal_sampler = GoalSampler(args, test_set_list)
 
     # Initialize RL Agent
     if args.agent == "SAC":
@@ -68,6 +74,7 @@ def launch(args):
     # Initialize Rollout Worker
     rollout_worker = RolloutWorker(env, policy, goal_sampler,  args)
 
+    
     # Main interaction loop
     episode_count = 0
     for epoch in range(args.n_epochs):
@@ -141,16 +148,21 @@ def launch(args):
             if rank==0: logger.info('\tRunning eval ..')
             # Performing evaluations
             t_i = time.time()
-            eval_goals = []
-            if args.algo == 'semantic':
-                instructions = ['close_1', 'close_2', 'close_3', 'stack_2', 'stack_3', '2stacks_2_2', '2stacks_2_3', 'pyramid_3',
-                                'mixed_2_3', 'stack_4', 'stack_5']
-                for instruction in instructions:
-                    eval_goal = get_eval_goals(instruction, n=args.n_blocks)
-                    eval_goals.append(eval_goal.squeeze(0))
-                eval_goals = np.array(eval_goals)
-            else:
-                eval_goals, _ = goal_sampler.sample_goal(evaluation=True)
+            if args.test_set_id != 1:
+                eval_goals = []
+                if args.algo == 'semantic':
+                    instructions = ['close_1', 'close_2', 'close_3', 'stack_2', 'stack_3', '2stacks_2_2', '2stacks_2_3', 'pyramid_3',
+                                    'mixed_2_3', 'stack_4', 'stack_5']
+                    for instruction in instructions:
+                        eval_goal = get_eval_goals(instruction, n=args.n_blocks)
+                        eval_goals.append(eval_goal.squeeze(0))
+                    eval_goals = np.array(eval_goals)
+                else:
+                    eval_goals, _ = goal_sampler.sample_goal(evaluation=True)
+            else: 
+                eval_goals_train = [np.fromstring(random.choice(list(ens))[1:-1], dtype=int, sep='. ').astype(np.float64) for ens in goal_sampler.train_set_list]
+                eval_goals_test = [np.fromstring(random.choice(list(ens))[1:-1], dtype=int, sep='. ').astype(np.float64) for ens in goal_sampler.test_set_list]
+                eval_goals = np.array(eval_goals_train + eval_goals_test)
             episodes = rollout_worker.generate_rollout(goals=eval_goals,
                                                        self_eval=True,
                                                        true_eval=True,  # this is offline evaluations

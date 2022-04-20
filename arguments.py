@@ -61,6 +61,8 @@ def get_args():
     # the testing arguments
     parser.add_argument('--n-test-rollouts', type=int, default=1, help='the number of tests')
 
+    # Transfer learning study
+    parser.add_argument('--test-set-id', type=int, default=1, help='1: Transfer permutations; 2: Transfer complex; 3: Transfer combinations')
     args = parser.parse_args()
 
     return args

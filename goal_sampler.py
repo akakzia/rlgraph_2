@@ -4,7 +4,7 @@ from mpi4py import MPI
 
 
 class GoalSampler:
-    def __init__(self, args):
+    def __init__(self, args, test_set_list):
         self.num_rollouts_per_mpi = args.num_rollouts_per_mpi
         self.rank = MPI.COMM_WORLD.Get_rank()
         self.n_classes = 11 if args.algo == 'semantic' else 5
@@ -29,6 +29,17 @@ class GoalSampler:
             self.LP = np.zeros([self.n_classes])
             self.C = np.zeros([self.n_classes])
             self.p = np.ones([self.n_classes]) / self.n_classes
+        
+        self.test_set_list = test_set_list
+        self.n_test_classes = len(test_set_list)
+        self.test_set_id = args.test_set_id
+
+        if args.test_set_id == 1:
+            self.train_set_list = [set(list(e)[len(e) // 3:]) for e in test_set_list]
+            self.test_set_list = [set(list(e)[:len(e) // 3]) for e in test_set_list]
+        self.test_set = set().union(*self.test_set_list)
+        
+        stop = 1
 
         self.init_stats()
 
@@ -155,11 +166,14 @@ class GoalSampler:
         # Number of classes of eval
         for i in np.arange(1, self.n_classes+1):
             self.stats['Eval_SR_{}'.format(i)] = []
-            self.stats['Av_Rew_{}'.format(i)] = []
             if self.use_curriculum:
                 self.stats['LP_{}'.format(i)] = []
                 self.stats['C_{}'.format(i)] = []
                 self.stats['p_{}'.format(i)] = []
+        
+        if self.n_test_classes == self.n_classes:
+            for i in range(1, self.n_test_classes + 1):
+                self.stats['Test_SR_{}'.format(i)] = []
         self.stats['epoch'] = []
         self.stats['episodes'] = []
         self.stats['global_sr'] = []
@@ -179,8 +193,10 @@ class GoalSampler:
         if self.algo == 'semantic':
             self.stats['nb_discovered'].append(len(self.discovered_goals))
         for g_id in np.arange(1, len(av_res) + 1):
-            self.stats['Eval_SR_{}'.format(g_id)].append(av_res[g_id-1])
-            self.stats['Av_Rew_{}'.format(g_id)].append(av_rew[g_id-1])
+            if g_id < self.n_classes + 1:
+                self.stats['Eval_SR_{}'.format(g_id)].append(av_res[g_id-1])
+            else:
+                self.stats['Test_SR_{}'.format(g_id - self.n_test_classes)].append(av_res[g_id-1])
             if self.use_curriculum:
                 self.stats['LP_{}'.format(g_id)].append(self.LP[g_id-1])
                 self.stats['C_{}'.format(g_id)].append(self.C[g_id-1])
