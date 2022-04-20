@@ -125,8 +125,9 @@ def launch(args):
 
             # Updating observation normalization
             t_i = time.time()
-            for e in episodes:
-                policy._update_normalizer(e)
+            if len(episodes) > 0:
+                for e in episodes:
+                    policy._update_normalizer(e)
             time_dict['norm_update'] += time.time() - t_i
 
             # Policy updates
