@@ -39,13 +39,14 @@ class ReplayBuffer:
             idxs = self._get_storage_idx(inc=batch_size)
 
             for i, e in enumerate(episode_batch):
-                # store the informations
-                self.buffer['obs'][idxs[i]] = e['obs']
-                self.buffer['ag'][idxs[i]] = e['ag']
-                self.buffer['g'][idxs[i]] = e['g']
-                self.buffer['actions'][idxs[i]] = e['act']
-                if self.goal_sampler.algo == 'continuous':
-                    self.goal_ids[idxs[i]] = e['goal_class']
+                if e['store_episode']:
+                    # store the informations
+                    self.buffer['obs'][idxs[i]] = e['obs']
+                    self.buffer['ag'][idxs[i]] = e['ag']
+                    self.buffer['g'][idxs[i]] = e['g']
+                    self.buffer['actions'][idxs[i]] = e['act']
+                    if self.goal_sampler.algo == 'continuous':
+                        self.goal_ids[idxs[i]] = e['goal_class']
 
     # sample the data from the replay buffer
     def sample(self, batch_size):

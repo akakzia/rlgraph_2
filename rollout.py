@@ -28,12 +28,13 @@ class RolloutWorker:
     def generate_rollout(self, goals, self_eval, true_eval, biased_init=False, animated=False):
         # In continuous case, goals correspond to classes of goals (0: no stacks | 1: stack 2 | 2: stack 3 | 3: stack 4 | 4: stack 5)
         episodes = []
-        # If encountered ag in test set, then do not store episode in buffer
-        store_episode = True
         # Reset only once for all the goals in cycle if not performing evaluation
         if not true_eval:
             observation = self.env.unwrapped.reset_goal(goal=np.array(goals[0]), biased_init=biased_init)
         for i in range(goals.shape[0]):
+            # If encountered ag in test set, then do not store episode in buffer
+            store_episode = True
+
             if true_eval or self_eval:
                 observation = self.env.unwrapped.reset_goal(goal=np.array(goals[i]), biased_init=False)
             obs = observation['observation']
@@ -52,7 +53,6 @@ class RolloutWorker:
                     is_in_test_set = str(ag) in self.goal_sampler.test_set 
                 if is_in_test_set and not true_eval:
                     store_episode = False
-                    stop = 1
                 # feed both the observation and mask to the policy module
                 action = self.policy.act(obs.copy(), ag.copy(), g.copy(), no_noise)
 
@@ -91,14 +91,14 @@ class RolloutWorker:
                            g=np.array(ep_g).copy(),
                            ag=np.array(ep_ag).copy(),
                            success=np.array(ep_success).copy(),
-                           rewards=np.array(ep_rewards).copy())
+                           rewards=np.array(ep_rewards).copy(), 
+                           store_episode=store_episode)
             
             episode['self_eval'] = self_eval
             if self.continuous:
                 episode['goal_class'] = goals[i]
 
-            if store_episode:
-                episodes.append(episode)
+            episodes.append(episode)
 
             # if not eval, make sure that no block has fallen. If so (or success), then reset
             fallen = at_least_one_fallen(obs, self.args.n_blocks)
